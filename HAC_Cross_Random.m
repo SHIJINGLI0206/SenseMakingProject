@@ -9,18 +9,18 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 file_dir = 'Data\';
-ActionNum = ['a02', 'a03', 'a05', 'a06', 'a10', 'a13', 'a25', 'a26'; % first row corresponds to action subset 'AS1'
-             'a01', 'a04', 'a07', 'a24', 'a09', 'a11', 'a22', 'a12'; % second row corresponds to action subset 'AS2'
-             'a21', 'a14', 'a15', 'a16', 'a17', 'a18', 'a19', 'a20']; % third row corresponds to action subset 'AS3'
+ActionNum = ['a01', 'a02', 'a03', 'a04', 'a05', 'a06', 'a07', 'a09','a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17','a18', 'a19', 'a20', 'a21', 'a22', 'a24', 'a25', 'a26']; % first row corresponds to action subset 'AS1'
+ %            'a01', 'a04', 'a07', 'a24', 'a09', 'a11', 'a22', 'a12', % second row corresponds to action subset 'AS2'
+ %            'a21', 'a14', 'a15', 'a16', 'a17', 'a18', 'a19', 'a20']; % third row corresponds to action subset 'AS3'
             
-NumAct = 8;          % number of actions in each subset
+NumAct = 24;          % number of actions in each subset
 row = 240;
 col = 320;
 max_subject = 8;     % default 10;    % maximum number of subjects for one action
 max_experiment = 4; % default 3;  % maximum number of experiments performed by one subject
 lambda = 0.001;
 frame_remove = 5;    % remove the first and last five frames (mostly the subject is in stand-still position in these frames)
-ratio = 3/4;     % default 1/2;    % half subjects as training
+ratio = 1/2;     % default 1/2;    % half subjects as training
 verbose = 0;
 
 ActionSet = 'AS1';
@@ -91,8 +91,12 @@ TotalFeature = TotalFeature(:,1:sum(OneActionSample));
 
 %% Generate training and testing data
 
-total_trial = 50;
+total_trial = 10;
 accuracy = zeros(1,total_trial);
+%confusion = zeros(1,total_trial);
+%CR = zeros(1,total_trial);  
+%FR = zeros(1,total_trial);
+  
 
 index_file = [ActionSet '.cross.' num2str(total_trial) '.trial.mat'];
 if exist(index_file, 'file')
@@ -152,7 +156,13 @@ for trial = 1:total_trial
 
     label = L2_CRC(F_train, F_test, F_train_size, NumAct, lambda);
     [confusion, accuracy(trial), CR, FR] = confusion_matrix(label, F_test_size);
-
+    fprintf('confusion:\n');
+    confusion
+    fprintf('CR:\n');
+    CR
+    fprintf('FR:\n');
+    FR
+    
     if verbose
         fprintf('Trial %d accuracy = %f\n', trial, accuracy(trial));
     end
