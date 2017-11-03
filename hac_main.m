@@ -22,7 +22,7 @@ function varargout = hac_main(varargin)
 
 % Edit the above text to modify the response to help hac_main
 
-% Last Modified by GUIDE v2.5 31-Oct-2017 22:26:38
+% Last Modified by GUIDE v2.5 02-Nov-2017 00:42:14
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -73,108 +73,44 @@ function varargout = hac_main_OutputFcn(hObject, eventdata, handles)
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
-
-% --- Executes during object creation, after setting all properties.
-function density_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to density (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: popupmenu controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function density_Callback(hObject, eventdata, handles)
-% hObject    handle to density (see GCBO)
+% --- Executes on button press in build_model.
+function build_model_Callback(hObject, eventdata, handles)
+% hObject    handle to build_model (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+%% -- Show waiting animation
+iconsClassName = 'com.mathworks.widgets.BusyAffordance$AffordanceSize';
+iconsSizeEnums = javaMethod('values',iconsClassName);
+SIZE_32x32 = iconsSizeEnums(4);  % (1) = 16x16,  (2) = 32x32
+jObj = com.mathworks.widgets.BusyAffordance(SIZE_32x32, 'Training...');  % icon, label
 
-% Hints: get(hObject,'String') returns contents of density as text
-%        str2double(get(hObject,'String')) returns contents of density as a double
-density = str2double(get(hObject, 'String'));
-if isnan(density)
-    set(hObject, 'String', 0);
-    errordlg('Input must be a number','Error');
+
+jObj.setPaintsWhenStopped(true);  % default = false
+jObj.useWhiteDots(false);         % default = false (true is good for dark backgrounds)
+pos = getpixelposition(handles.build_model,true);
+javacomponent(jObj.getComponent, [pos(1)+pos(3),pos(2),80,80], gcf);
+jObj.start;
+% Feature extraction.
+drawnow
+group_no = 1;
+if( get(handles.rb_a9_16,'Value'))
+    group_no = 2;
+elseif(get(handles.rb_a17_24,'Value'))
+    group_no = 3;
 end
+handles.group_no = group_no;
+% Build CRC Model
+[accuracy, F_train_model, F_train_size_model] = crc_build_model(group_no);
+handles.F_train = F_train_model;
+handles.F_train_size = F_train_size_model;
+jObj.stop;
+jObj.setBusyText('Done');
 
-% Save the new density value
-handles.metricdata.density = density;
+% Display accuracy
+set(handles.score,'Visible','on');
+str_accuracy = sprintf('Accuracy: %.2f', accuracy);
+set(handles.score, 'String',str_accuracy);
 guidata(hObject,handles)
-
-% --- Executes during object creation, after setting all properties.
-function volume_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to volume (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: popupmenu controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-
-function volume_Callback(hObject, eventdata, handles)
-% hObject    handle to volume (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of volume as text
-%        str2double(get(hObject,'String')) returns contents of volume as a double
-volume = str2double(get(hObject, 'String'));
-if isnan(volume)
-    set(hObject, 'String', 0);
-    errordlg('Input must be a number','Error');
-end
-
-% Save the new volume value
-handles.metricdata.volume = volume;
-guidata(hObject,handles)
-
-% --- Executes on button press in calculate.
-function calculate_Callback(hObject, eventdata, handles)
-% hObject    handle to calculate (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-%mass = handles.metricdata.density * handles.metricdata.volume;
-%set(handles.mass, 'String', mass);
-load('Data/a01/a1_s1_t1_depth.mat');
-num_frame = size(d_depth,3);
-
-for i = 1:num_frame
-    imagesc(d_depth(:,:,i),'Parent',handles.axes1); axis off;
-    pause(1/20);
-end
-
-% --- Executes on button press in reset.
-function reset_Callback(hObject, eventdata, handles)
-% hObject    handle to reset (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-initialize_gui(gcbf, handles, true);
-
-% --- Executes when selected object changed in unitgroup.
-function unitgroup_SelectionChangeFcn(hObject, eventdata, handles)
-% hObject    handle to the selected object in unitgroup 
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-if (hObject == handles.english)
-    set(handles.text4, 'String', 'lb/cu.in');
-    set(handles.text5, 'String', 'cu.in');
-    set(handles.text6, 'String', 'lb');
-else
-    set(handles.text4, 'String', 'kg/cu.m');
-    set(handles.text5, 'String', 'cu.m');
-    set(handles.text6, 'String', 'kg');
-end
 
 % --------------------------------------------------------------------
 function initialize_gui(fig_handle, handles, isreset)
@@ -187,32 +123,105 @@ end
 
 axis off;
 
-%handles.metricdata.density = 0;
-%handles.metricdata.volume  = 0;
+% Actions data name
+handles.actions_name = ["Swipe Left","Swipe Right","Wave","Clap","Throw","Arm Cross","Basketball Shoot","Draw X","Draw Circle CW", "Draw Circle CCW","Draw Triangle","Bowling","Boxing","Baseball Swing","Tennis Swing","Arm Curl","Tennis Serve", "Push", "Knock","Catch","Pickup Throw","Jog","Walk","Sit to Stand","Stand to Sit","Lunge","Squat"];
 
-%set(handles.density, 'String', handles.metricdata.density);
-%set(handles.volume,  'String', handles.metricdata.volume);
-%set(handles.mass, 'String', 0);
+% Set default train data set
+set(handles.rb_a1_8, 'Value',1);
+set(handles.rb_a9_16, 'Value',0);
+set(handles.rb_a17_24, 'Value',0);
 
-%set(handles.unitgroup, 'SelectedObject', handles.english);
-
-%set(handles.text4, 'String', 'lb/cu.in');
-%set(handles.text5, 'String', 'cu.in');
-%set(handles.text6, 'String', 'lb');
+% Keep figure screen center
+movegui(gcf,'center')
 
 % Update handles structure
 guidata(handles.figure1, handles);
 
 
-% --- Executes on button press in pushbutton9.
-function pushbutton9_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton9 (see GCBO)
+% --- Executes on button press in load_one_action.
+function load_one_action_Callback(hObject, eventdata, handles)
+% hObject    handle to load_one_action (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+set(handles.action_selected,'String','');
+set(handles.action_predicted,'String','');
 
-% --- Executes on button press in pushbutton10.
-function pushbutton10_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton10 (see GCBO)
+% Load selected action file
+root_path = 'Data2/Test/';
+file_name = uigetfile(root_path);
+if file_name==0
+   return; 
+end
+handles.filename = file_name;
+
+ind = strfind(file_name,'_');
+action_no = file_name(2:ind(1)-1);
+handles.action_no =  str2num(action_no);
+if(length(action_no) == 1)
+   action_name = strcat('a0', action_no);
+elseif (length(action_no) == 2)
+    action_name = strcat('a', action_no);
+end
+action_folder = strcat(root_path, action_name, '/');
+
+% Show action name
+set(handles.text18,'Visible','on');
+set(handles.action_selected,'Visible','on');
+set(handles.text20,'Visible','on');
+set(handles.action_selected,'String',handles.actions_name(str2num(action_no)));
+
+% Show the action animation
+load(strcat(action_folder, file_name));
+num_frame = size(d_depth,3);
+for i = 1:num_frame
+    imagesc(d_depth(:,:,i),'Parent',handles.axes1); axis off;
+    pause(1/20);
+end
+
+guidata(hObject,handles)
+
+
+% --- Executes on button press in predict.
+function predict_Callback(hObject, eventdata, handles)
+% hObject    handle to predict (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+label = crc_1action_classifier(handles.F_train,handles.F_train_size,handles.filename,handles.group_no);
+label
+if(label>0 && label<25)
+    set(handles.action_predicted,'String',handles.actions_name(label));
+end
+
+% --- Executes on button press in rb_a1_8.
+function rb_a1_8_Callback(hObject, eventdata, handles)
+% hObject    handle to rb_a1_8 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.rb_a1_8, 'Value',1);
+set(handles.rb_a9_16, 'Value',0);
+set(handles.rb_a17_24, 'Value',0);
+% Hint: get(hObject,'Value') returns toggle state of rb_a1_8
+
+
+% --- Executes on button press in rb_a9_16.
+function rb_a9_16_Callback(hObject, eventdata, handles)
+% hObject    handle to rb_a9_16 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.rb_a1_8, 'Value',0);
+set(handles.rb_a9_16, 'Value',1);
+set(handles.rb_a17_24, 'Value',0);
+% Hint: get(hObject,'Value') returns toggle state of rb_a9_16
+
+
+% --- Executes on button press in rb_a17_24.
+function rb_a17_24_Callback(hObject, eventdata, handles)
+% hObject    handle to rb_a17_24 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.rb_a1_8, 'Value',0);
+set(handles.rb_a9_16, 'Value',0);
+set(handles.rb_a17_24, 'Value',1);
+% Hint: get(hObject,'Value') returns toggle state of rb_a17_24

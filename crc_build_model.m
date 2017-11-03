@@ -1,31 +1,41 @@
+function [accuracy,F_train_model, F_train_size_model] = crc_build_model(group_no)
+%CRC_BUILD_MODEL Summary of this function goes here
+%   Detailed explanation goes here
+%EXTRACT_FEATURES Summary of this function goes here
+%   Detailed explanation goes here
 
-file_dir = 'Data\';
-ActionNum = ['a01','a02','a03','a04','a05','a06','a07','a09','a10','a11','a12','a13','a14','a15','a16','a17','a18','a19','a20','a21','a22','a24','a25','a26'];
+file_dir = 'Data2\';
+ActionNum = ['a01','a02','a03','a04','a05','a06','a07','a09';
+             'a10','a11','a12','a13','a14','a15','a16','a17';
+             'a18','a19','a20','a21','a22','a24','a25','a26'];
+%,'a10','a11','a12','a13','a14','a15','a16','a17','a18','a19','a20','a21','a22','a24','a25','a26'];
 %               ['a02', 'a03', 'a05', 'a06', 'a10', 'a13', 'a18', 'a20']; % first row corresponds to action subset 'AS1'
 %             'a01', 'a04', 'a07', 'a08', 'a09', 'a11', 'a14', 'a12'; % second row corresponds to action subset 'AS2'
 %             'a06', 'a14', 'a15', 'a16', 'a17', 'a18', 'a19', 'a20']; % third row corresponds to action subset 'AS3'
             
-NumAct = 24; % default 8;          % number of actions in each subset
+NumAct = 8; % default 8;          % number of actions in each subset
 row = 240;
 col = 320;
 max_subject = 8;     %default 10    % maximum number of subjects for one action
-max_experiment = 4;  % default 3;  % maximum number of experiments performed by one subject
+max_experiment = 3;  % default 3;  % maximum number of experiments performed by one subject
 lambda = 0.001;      % Tikhonov regularization parameter (parameter tuning for the optimal value)
 frame_remove = 5;    % remove the first and last five frames (mostly the subject is in stand-still position in these frames)
 
-ActionSet = 'AS1';   
-T = 3;               % number of samples of each subject for training
+T = 2;               % number of samples of each subject for training
+
+ActionSets = ["AS1","AS2","AS3"];
+ActionSet = ActionSets(group_no);  % group_actions = 1,2,3
+
+
 fprintf('Action set: %s; %d training sample(s) of each subject\n', ActionSet, T);
+fprintf('Start Work at: %s\n', datetime('now'));
 
 switch ActionSet
     case 'AS1'
         subset = 1;
         fix_size_front = round([100;50]/2); fix_size_side = round([100;82]/2); fix_size_top = round([82;47]/2);
         %fix_size_front = [100;50]; fix_size_side = [100;82]; fix_size_top = [82;47];
-        % the fixed size of each projection view is calculated as the
-        % average size of DMMs of all samples, here we did not optimize the
-        % sizes.
-        % 
+
     case 'AS2'
         subset = 2;
         fix_size_front = round([102;51]/2); fix_size_side = round([103;67]/2); fix_size_top = round([67;51]/2);
@@ -76,6 +86,8 @@ for i = 1:NumAct
     sample_ind{i} = ind;
 end
 TotalFeature = TotalFeature(:,1:sum(OneActionSample));
+fprintf('Finish feature extraction at: %s\n', datetime('now'));
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % You may consider to save the training and testing samples for speed.
@@ -121,9 +133,10 @@ for i = 1:NumAct
     count = count + OneActionSample(i);
 end
 clear F1 F2
-
+fprintf('Finish generating training data and test data at: %s\n', datetime('now'));
 %%%%% PCA on training samples and test samples
-
+F_train_model = F_train;
+F_train_size_model = F_train_size;
 Dim = size(F_train,2) - 35; % AS1:20; AS2:35; AS3:35 (Try a set of dimensions and tune the reduced dimensionality for optimal result)
 disc_set = Eigenface_f(single(F_train),Dim);
 F_train = disc_set'*F_train;
@@ -131,32 +144,15 @@ F_test  = disc_set'*F_test;
 F_train = F_train./(repmat(sqrt(sum(F_train.*F_train)), [Dim,1]));
 F_test  = F_test./(repmat(sqrt(sum(F_test.*F_test)), [Dim,1]));
 
+fprintf('Finish PCA at: %s\n', datetime('now'));
+%% Testing
 
-%%%%% write Train and test data into txt files.
-X_train = F_train';
-y_test = F_test';
-write_txt('X_train.txt',X_train,24);
-write_txt('y_test.txt',y_test,8);
+%////////////////////////////////////////////////////////////////////%    
+%         Tikhonov regularized Collaborative Classifier              %
+%////////////////////////////////////////////////////////////////////%
 
-%%%%% write Train and test data into txt files.
-[train_label, train_scale_inst] = libsvmread('X_train.txt');
-[test_label, test_scale_inst] = libsvmread('X_test.txt');
-model = svmtrain(train_label, train_scale_inst, '-s 1 -t 0 -c 1 -g 0.07 -b 1');
-[predict_label, accuracy, prob_estimates] = svmpredict(test_label, test_scale_inst, model, '-b 1');
-
-CR_SVM = zeros(24,1);
-for i = 1 : size(predict_label,1)
-   m = floor((i-1)/8) + 1;
-   CR_SVM(m) = CR_SVM(m) + (predict_label(i) == m);  
+label = L2_CRC(F_train, F_test, F_train_size, NumAct, lambda);
+[confusion, accuracy, CR, FR] = confusion_matrix(label, F_test_size);
+fprintf('Finish calculating accuracy at: %s\n', datetime('now'));
 end
-CR_SVM = CR_SVM ./ 8;
-
-str={'a01';'a02';'a03';'a04';'a05';'a06';'a07';'a09';'a10';'a11';'a12';'a13';'a14';'a15';'a16';'a17';'a18';'a19';'a20';'a21';'a22';'a24';'a25';'a26'};
-
-bar(CR_SVM,0.4);
-set(gca, 'XTickLabel',str, 'XTick',1:numel(str));
-xlabel('Actions','FontSize',14,'FontWeight','bold','Color','b')
-ylabel('Accuracy (%)','FontSize',14,'FontWeight','bold','Color','b')
-title('SVM Classification Accuracy','FontSize',16,'Color', 'b')
-
 

@@ -19,13 +19,14 @@ NumAct = 8; % default 8;          % number of actions in each subset
 row = 240;
 col = 320;
 max_subject = 8;     %default 10    % maximum number of subjects for one action
-max_experiment = 3;  % default 3;  % maximum number of experiments performed by one subject
+max_experiment = 4;  % default 3;  % maximum number of experiments performed by one subject
 lambda = 0.001;      % Tikhonov regularization parameter (parameter tuning for the optimal value)
 frame_remove = 5;    % remove the first and last five frames (mostly the subject is in stand-still position in these frames)
 
 ActionSet = 'AS1';   
-T = 2;               % number of samples of each subject for training
+T = 3;               % number of samples of each subject for training
 fprintf('Action set: %s; %d training sample(s) of each subject\n', ActionSet, T);
+fprintf('Start Work at: %s\n', datetime('now'));
 
 switch ActionSet
     case 'AS1'
@@ -86,6 +87,7 @@ for i = 1:NumAct
     sample_ind{i} = ind;
 end
 TotalFeature = TotalFeature(:,1:sum(OneActionSample));
+fprintf('Finish feature extraction at: %s\n', datetime('now'));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % You may consider to save the training and testing samples for speed.
@@ -103,6 +105,7 @@ F_test_size = zeros(1,NumAct);
 error = zeros(1,NumAct);
 F_train = [];
 F_test = [];
+Index_Action_Test = 3;
 
 count = 0;
 for i = 1:NumAct      
@@ -118,7 +121,7 @@ for i = 1:NumAct
         num_sample = sum(ID(j,:));
         tmp = F(:,start+1:start+num_sample);
         F1(:,(j-1)*T+1:j*T) = tmp(:,1:T); 
-        if T < num_sample
+        if T < num_sample && isempty(F2)
             F2 = [F2 tmp(:,T+1:end)];
         end   
         start = start + num_sample;
@@ -127,11 +130,13 @@ for i = 1:NumAct
     F_train_size(i) = size(F1,2);   
     F_test_size(i) = size(F2,2);
     F_train = [F_train F1];
-    F_test = [F_test F2];
+    if i == Index_Action_Test
+        F_test = [F_test F2];
+    end
     count = count + OneActionSample(i);
 end
 clear F1 F2
-
+fprintf('Finish generate training data and test data at: %s\n', datetime('now'));
 %%%%% PCA on training samples and test samples
 
 Dim = size(F_train,2) - 35; % AS1:20; AS2:35; AS3:35 (Try a set of dimensions and tune the reduced dimensionality for optimal result)
@@ -140,7 +145,7 @@ F_train = disc_set'*F_train;
 F_test  = disc_set'*F_test;
 F_train = F_train./(repmat(sqrt(sum(F_train.*F_train)), [Dim,1]));
 F_test  = F_test./(repmat(sqrt(sum(F_test.*F_test)), [Dim,1]));
-
+fprintf('Finish PCA on train and test data at: %s\n', datetime('now'));
 
 %% Testing
 
@@ -148,10 +153,9 @@ F_test  = F_test./(repmat(sqrt(sum(F_test.*F_test)), [Dim,1]));
 %         Tikhonov regularized Collaborative Classifier              %
 %////////////////////////////////////////////////////////////////////%
 
-F_test = F_test(:,15);
-
 label = L2_CRC(F_train, F_test, F_train_size, NumAct, lambda);
 [confusion, accuracy, CR, FR] = confusion_matrix(label, F_test_size);
+fprintf('Finish CRC at: %s\n', datetime('now'));
 fprintf('Accuracy = %f\n', accuracy);
 fprintf('confusion: \n');
 confusion
