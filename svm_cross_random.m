@@ -9,21 +9,21 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 file_dir = 'Data\';
-ActionNum = ['a01', 'a02', 'a03', 'a04', 'a05', 'a06', 'a07'; 
-    'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16';%, 'a17';
-    'a18', 'a19', 'a20', 'a21', 'a22', 'a24', 'a25'];%, 'a26']; %, 'a09'; % first row corresponds to action subset 'AS1'
+ActionNum = ['a01', 'a02', 'a03', 'a04', 'a05', 'a06', 'a07', 'a09';
+            'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17';
+            'a18', 'a19', 'a20', 'a21', 'a22', 'a24', 'a25', 'a26']; % first row corresponds to action subset 'AS1'
  %            'a01', 'a04', 'a07', 'a24', 'a09', 'a11', 'a22', 'a12', % second row corresponds to action subset 'AS2'
  %            'a21', 'a14', 'a15', 'a16', 'a17', 'a18', 'a19', 'a20']; % third row corresponds to action subset 'AS3'
+       
+action_names={'a01';'a02';'a03';'a04';'a05';'a06';'a07';'a09';'a10';'a11';'a12';'a13';'a14';'a15';'a16';'a17';'a18';'a19';'a20';'a21';'a22';'a24';'a25';'a26'};
 
- action_names={'a01';'a02';'a03';'a04';'a05';'a06';'a07';'a09';'a10';'a11';'a12';'a13';'a14';'a15';'a16';'a17';'a18';'a19';'a20';'a21';'a22';'a24';'a25';'a26'};
 
-
-NumAct = 7;          % number of actions in each subset
+NumAct = 8;          % number of actions in each subset
 row = 240;
 col = 320;
 max_subject = 8;     % default 10;    % maximum number of subjects for one action
 max_experiment = 4; % default 3;  % maximum number of experiments performed by one subject
-lambda = 0.01;
+lambda = 0.001;
 frame_remove = 5;    % remove the first and last five frames (mostly the subject is in stand-still position in these frames)
 ratio = 1/2;     % default 1/2;    % half subjects as training
 verbose = 0;
@@ -98,7 +98,7 @@ fprintf('Finish feature extraction at: %s\n', datetime('now'));
 
 total_trial = 20;
 accuracy = zeros(1,total_trial);
-CR = zeros(total_trial,NumAct);
+CR_SVM = zeros(NumAct,total_trial);
 %confusion = zeros(1,total_trial);
 %CR = zeros(1,total_trial);  
 %FR = zeros(1,total_trial);
@@ -152,42 +152,49 @@ for trial = 1:total_trial
     F_test  = disc_set'*F_test;
     F_train = F_train./(repmat(sqrt(sum(F_train.*F_train)), [Dim,1]));
     F_test  = F_test./(repmat(sqrt(sum(F_test.*F_test)), [Dim,1]));
-
     fprintf('Finish PCA at: %s\n', datetime('now'));
-    %% Testing
-
-    %////////////////////////////////////////////////////////////////////%    
-    %         Tikhonov regularized Collaborative Classifier              %
-    %////////////////////////////////////////////////////////////////////%
-
-    label = L2_CRC(F_train, F_test, F_train_size, NumAct, lambda);
-    [confusion, accuracy(trial), CR(trial,:), FR] = confusion_matrix(label, F_test_size);
-    fprintf('confusion:\n');
-    confusion
-    fprintf('CR:\n');
-    CR
-    fprintf('FR:\n');
-    FR
     
-    if verbose
-        fprintf('Trial %d accuracy = %f\n', trial, accuracy(trial));
+    %% write Train and test data into txt files.
+    X_train = F_train';
+    X_test = F_test';
+    write_txt('X_train_cr.txt',X_train,max_subject*max_experiment*ratio);
+    write_txt('X_test_cr.txt',X_test,max_subject*max_experiment*(1 - ratio));
+
+    
+    %% write Train and test data into txt files.
+    [train_label, train_scale_inst] = libsvmread('X_train_cr.txt');
+    [test_label, test_scale_inst] = libsvmread('X_test_cr.txt');
+    model = svmtrain(train_label, train_scale_inst, '-s 1 -t 0 -c 1 -g 0.07 -b 1');
+    [predict_label, acc, prob_estimates] = svmpredict(test_label, test_scale_inst, model, '-b 1');
+    accuracy(trial) = acc(1);
+    %% calculate accuracy
+
+    for i = 1 : size(predict_label,1)
+       m = floor((i-1)/ (max_experiment * max_subject * ratio)) + 1;
+       CR_SVM(m,trial) = CR_SVM(m,trial) + (predict_label(i) == m);  
     end
+    CR_SVM = CR_SVM ./ (max_experiment * max_subject * ratio);
+
     
 end
 fprintf('End Work at: %s\n', datetime('now'));
 fprintf('Average accuracy = %f; std = %f \n', mean(accuracy), std(accuracy));
 
-if index_file_flag
-    save(index_file, 'IND');
-end
 
-CR_SVM_Avg = sum(CR);
+%% plot classification accuracy bar 
+CR_SVM_Avg = sum(CR_SVM,2);
 str = action_names((subset - 1)*NumAct + 1 : subset*NumAct );
 bar(CR_SVM_Avg,0.4);
 set(gca, 'XTickLabel',str, 'XTick',1:numel(str));
 xlabel('Actions','FontSize',14,'FontWeight','bold','Color','b')
 ylabel('Accuracy (%)','FontSize',14,'FontWeight','bold','Color','b')
 title('Cross Random SVM Classification Accuracy','FontSize',16,'Color', 'b')
+
+if index_file_flag
+    save(index_file, 'IND');
+end
+
+
 
 
 

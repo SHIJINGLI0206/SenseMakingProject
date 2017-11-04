@@ -145,7 +145,7 @@ model = svmtrain(train_label, train_scale_inst, '-s 1 -t 0 -c 1 -g 0.07 -b 1');
 [predict_label, accuracy, prob_estimates] = svmpredict(test_label, test_scale_inst, model, '-b 1');
 
 %% calculate accuracy
-CR_SVM = zeros(24,1);
+CR_SVM = zeros(NumAct,1);
 for i = 1 : size(predict_label,1)
    m = floor((i-1)/8) + 1;
    CR_SVM(m) = CR_SVM(m) + (predict_label(i) == m);  

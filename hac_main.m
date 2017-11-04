@@ -78,6 +78,15 @@ function build_model_Callback(hObject, eventdata, handles)
 % hObject    handle to build_model (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+%% -- Clear previous model
+set(handles.action_selected,'String','');
+set(handles.action_predicted,'String','');
+set(handles.text18,'Visible','off');
+set(handles.text20,'Visible','off');
+set(handles.score, 'String','Accuracy: ');
+cla 
+
 %% -- Show waiting animation
 iconsClassName = 'com.mathworks.widgets.BusyAffordance$AffordanceSize';
 iconsSizeEnums = javaMethod('values',iconsClassName);
@@ -125,7 +134,7 @@ axis off;
 
 % Actions data name
 handles.actions_name = ["Swipe Left","Swipe Right","Wave","Clap","Throw","Arm Cross","Basketball Shoot","Draw X","Draw Circle CW", "Draw Circle CCW","Draw Triangle","Bowling","Boxing","Baseball Swing","Tennis Swing","Arm Curl","Tennis Serve", "Push", "Knock","Catch","Pickup Throw","Jog","Walk","Sit to Stand","Stand to Sit","Lunge","Squat"];
-
+ 
 % Set default train data set
 set(handles.rb_a1_8, 'Value',1);
 set(handles.rb_a9_16, 'Value',0);
@@ -167,7 +176,6 @@ action_folder = strcat(root_path, action_name, '/');
 
 % Show action name
 set(handles.text18,'Visible','on');
-set(handles.action_selected,'Visible','on');
 set(handles.text20,'Visible','on');
 set(handles.action_selected,'String',handles.actions_name(str2num(action_no)));
 
@@ -189,8 +197,25 @@ function predict_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 label = crc_1action_classifier(handles.F_train,handles.F_train_size,handles.filename,handles.group_no);
+
+% Choose correct action name
+if(handles.group_no == 1)
+    if (label == 8)
+       label = label + 1; 
+    end
+elseif (handles.group_no == 2)
+    label = label + 1; 
+elseif (handles.group_no == 3)
+    if(label<6)
+       label = label + 1;
+    elseif(label>=6)
+        label = label + 2;
+    end
+end
+
+label = label + (handles.group_no - 1) * 8;
 label
-if(label>0 && label<25)
+if(label>0 && label<28)
     set(handles.action_predicted,'String',handles.actions_name(label));
 end
 
